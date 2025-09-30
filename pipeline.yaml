@@ -30,22 +30,18 @@ spec:
   - name: build-push
     runAfter: ["fetch-builder"]
     taskRef:
-      name: kaniko
+      name: buildah
     workspaces:
     - name: dockerconfig
       workspace: docker-credentials
     - name: source
       workspace: shared-data
-    env:
-      - name: BASIC_AUTH_PASSWORD
-        valueFrom:
-          secretKeyRef:
-            name: github-creds
-            key: password
     params:
     - name: IMAGE
       value: $(params.image-reference)
-    - name: EXTRA_ARGS
+    - name: TLSVERIFY
+      value: "false"
+    - name: BUILD_EXTRA_ARGS
       value:
       - --skip-tls-verify
       - --build-arg 
@@ -53,4 +49,12 @@ spec:
       - --build-arg 
       - GITHUB_CREDS_USR=$(params.github-user)
       - --build-arg 
-      - GITHUB_CREDS_PSW=$(BASIC_AUTH_PASSWORD)
+      - GITHUB_CREDS_PSW=$(GITHUB_CREDS_PSW)
+      # Inject GitHub password from secret
+      stepTemplate:
+        env:
+          - name: GITHUB_CREDS_PSW
+            valueFrom:
+              secretKeyRef:
+                name: github-creds
+                key: password
