@@ -1,0 +1,56 @@
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: build-wx-mcp
+spec:
+  description: | 
+    This pipeline builds an edge runtime with the WxMCPServer package as a container
+  params:
+  - name: repo-url
+    type: string
+  - name: image-reference
+    type: string
+  - name: edge-version
+    type: string
+  - name: github-user
+    type: string
+  workspaces:
+  - name: shared-data
+  - name: docker-credentials
+  tasks:
+  - name: fetch-builder
+    taskRef:
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: shared-data
+    params:
+    - name: url
+      value: $(params.repo-url)
+  - name: build-push
+    runAfter: ["fetch-builder"]
+    taskRef:
+      name: kaniko
+    workspaces:
+    - name: dockerconfig
+      workspace: docker-credentials
+    - name: source
+      workspace: shared-data
+    env:
+      - name: BASIC_AUTH_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: github-creds
+            key: password
+    params:
+    - name: IMAGE
+      value: $(params.image-reference)
+    - name: EXTRA_ARGS
+      value:
+      - --skip-tls-verify
+      - --build-arg 
+      - EDGE_VERSION=$(params.edge-version)
+      - --build-arg 
+      - GITHUB_CREDS_USR=$(params.github-user)
+      - --build-arg 
+      - GITHUB_CREDS_PSW=$(BASIC_AUTH_PASSWORD)

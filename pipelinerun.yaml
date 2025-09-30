@@ -1,0 +1,31 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: build-wxmcpserver-run-
+spec:
+  pipelineRef:
+    name: build-wx-mcp
+  podTemplate:
+    securityContext:
+      fsGroup: 65532
+  workspaces:
+  - name: docker-credentials
+    secret:
+      secretName: regcred
+  - name: shared-data
+    volumeClaimTemplate:
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi
+  params:
+  - name: repo-url
+    value: https://github.com/elpinjo/WxMCPBuilder.git
+  - name: image-reference
+    value: registry-service.registry/wx-mcp-msr:11.1
+  - name: edge-version
+    value: 11.2.0
+  - name: github-user
+    value: elpinjo
