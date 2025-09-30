@@ -1,4 +1,45 @@
 apiVersion: tekton.dev/v1beta1
+kind: Task
+metadata:
+  name: buildah-with-secret
+spec:
+  params:
+    - name: IMAGE
+      type: string
+    - name: EDGE_VERSION
+      type: string
+    - name: TLSVERIFY
+      type: string
+    - name: GITHUB_CREDS_USR
+      type: string
+  workspaces:
+    - name: source
+    - name: dockerconfig
+  steps:
+    - name: build
+      image: quay.io/buildah/stable
+      env:
+        - name: EDGE_VERSION
+          value: $(params.EDGE_VERSION)
+        - name: GITHUB_CREDS_USR
+          value: $(params.GITHUB_CREDS_USR)
+        - name: GITHUB_CREDS_PSW
+          valueFrom:
+            secretKeyRef:
+              name: github-creds
+              key: password
+      script: |  
+        #!/bin/sh
+        buildah bud \
+          --tls-verify=$(params.TLSVERIFY) \
+          --build-arg EDGE_VERSION=$EDGE_VERSION \
+          --build-arg GITHUB_CREDS_USR=$GITHUB_CREDS_USR \
+          --build-arg GITHUB_CREDS_PSW=$GITHUB_CREDS_PSW \
+          -t $(params.IMAGE) \
+          $(workspaces.source.path)
+
+---
+apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
   name: build-wx-mcp
@@ -30,7 +71,7 @@ spec:
   - name: build-push
     runAfter: ["fetch-builder"]
     taskRef:
-      name: buildah
+      name: buildah-with-secret
     workspaces:
     - name: dockerconfig
       workspace: docker-credentials
@@ -41,20 +82,7 @@ spec:
       value: $(params.image-reference)
     - name: TLSVERIFY
       value: "false"
-    - name: BUILD_EXTRA_ARGS
-      value:
-      - --skip-tls-verify
-      - --build-arg 
-      - EDGE_VERSION=$(params.edge-version)
-      - --build-arg 
-      - GITHUB_CREDS_USR=$(params.github-user)
-      - --build-arg 
-      - GITHUB_CREDS_PSW=$(GITHUB_CREDS_PSW)
-      # Inject GitHub password from secret
-      stepTemplate:
-        env:
-          - name: GITHUB_CREDS_PSW
-            valueFrom:
-              secretKeyRef:
-                name: github-creds
-                key: password
+    - name: EDGE_VERSION
+      value: $(params.edge-version)
+    - name: GITHUB_CREDS_USR
+      value: $(params.github-user)
